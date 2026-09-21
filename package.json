@@ -1,0 +1,32 @@
+{
+  "name": "warmup-control-center",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p backend/tsconfig.json",
+    "start": "node backend/dist/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only backend/src/server.ts",
+    "worker": "python backend/python-worker/app.py",
+    "frontend": "npm run dev --prefix frontend"
+  },
+  "dependencies": {
+    "@types/ssh2": "^1.15.5",
+    "bcrypt": "^5.1.0",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.0.0",
+    "mysql2": "^3.24.2",
+    "node-fetch": "^3.3.1",
+    "nodemailer": "^6.9.0",
+    "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.0",
+    "@types/express": "^4.17.17",
+    "@types/jsonwebtoken": "^9.0.1",
+    "@types/node": "^18.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0"
+  }
+}

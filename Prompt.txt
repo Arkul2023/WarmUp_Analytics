@@ -1,0 +1,1283 @@
+# Warmup Control Center — Desktop Application
+
+## 1. PROJECT OBJECTIVE
+
+Build a production-quality native Windows desktop application called **Warmup Control Center**.
+
+The application is a centralized control, monitoring, and analytics layer for email warmup infrastructure.
+
+The application must connect to multiple MailWizz installations through the MailWizz API, automatically discover their delivery servers/mailboxes, synchronize MailWizz campaign/sending information, receive inbox-placement information from an existing Python inbox-checker worker, combine both datasets, and provide mailbox-level warmup intelligence.
+
+The application must NOT replace MailWizz.
+
+MailWizz remains the source of truth for:
+
+* Sending mailboxes / delivery servers
+* Campaigns
+* Sending activity
+* Delivery information
+* Bounce/defer/error information
+* MailWizz customer information
+
+The desktop application becomes the source of truth for:
+
+* Unified monitoring
+* Historical warmup analytics
+* Mailbox-level health
+* Joined sending + placement information
+* User-specific configuration
+* Cross-MailWizz visibility
+
+The key product question the application must answer is:
+
+> "What is happening to each individual sending email ID?"
+
+The user must be able to drill down from:
+
+```text
+Overall warmup
+    ↓
+Campaign
+    ↓
+Sending mailbox
+    ↓
+Individual send event
+    ↓
+Recipient
+    ↓
+Inbox / Spam / Promotions / Not Found
+```
+
+---
+
+# 2. IMPORTANT PRODUCT REQUIREMENTS
+
+The initial infrastructure is expected to include:
+
+* 50 `.com` Workspace sending accounts
+* 25 SMTP sending accounts
+* 75 sending mailboxes in total
+* 50 seed Gmail receiving accounts
+* 15 employee/test receiving accounts
+* 65 receiving accounts in total
+* Multiple MailWizz installations/licenses, currently approximately 3
+
+The system must be designed so these numbers are configuration/data, NOT hardcoded limits.
+
+The system must support:
+
+* 75 mailboxes today
+* Hundreds of mailboxes later
+* Multiple MailWizz installations
+* Multiple users
+* User-specific infrastructure
+* Historical mailbox records
+* Dropped/deleted MailWizz delivery servers without destroying historical data
+
+Do not hardcode "50 Workspace", "25 SMTP", "3 MailWizz", etc.
+
+---
+
+# 3. APPLICATION TYPE
+
+Build a native Windows desktop application.
+
+Preferred architecture:
+
+```text
+Desktop UI
+React + TypeScript
+        ↓
+Desktop shell
+Electron
+        ↓
+Backend API
+Node.js + TypeScript + Express
+        ↓
+Database
+MongoDB
+```
+
+Use TypeScript throughout the JavaScript/Node/React portions.
+
+The existing Python inbox-checker remains a separate worker/service.
+
+Do not rewrite the existing Python inbox checker initially.
+
+---
+
+# 4. PROJECT STRUCTURE
+
+Create this structure:
+
+```text
+warmup-control-center/
+│
+├── apps/
+│   │
+│   ├── desktop/
+│   │   ├── src/
+│   │   │   ├── components/
+│   │   │   ├── pages/
+│   │   │   ├── layouts/
+│   │   │   ├── hooks/
+│   │   │   ├── stores/
+│   │   │   ├── services/
+│   │   │   ├── types/
+│   │   │   ├── utils/
+│   │   │   ├── assets/
+│   │   │   ├── App.tsx
+│   │   │   └── main.tsx
+│   │   │
+│   │   └── electron/
+│   │       ├── main.ts
+│   │       ├── preload.ts
+│   │       └── ipc/
+│   │
+│   └── server/
+│       └── src/
+│           ├── config/
+│           ├── models/
+│           ├── controllers/
+│           ├── routes/
+│           ├── services/
+│           ├── integrations/
+│           │   └── mailwizz/
+│           ├── workers/
+│           ├── middleware/
+│           ├── utils/
+│           ├── types/
+│           └── server.ts
+│
+├── python/
+│   └── inbox-checker/
+│       ├── imap/
+│       ├── gmail/
+│       ├── outlook/
+│       ├── placement/
+│       └── main.py
+│
+├── shared/
+│   ├── types/
+│   └── constants/
+│
+├── database/
+│   ├── migrations/
+│   └── seed/
+│
+├── docs/
+│   ├── architecture.md
+│   ├── database.md
+│   ├── mailwizz-api.md
+│   └── development.md
+│
+├── .env
+├── .env.example
+├── .gitignore
+├── package.json
+└── README.md
+```
+
+Do not put everything into one or two giant files.
+
+Keep frontend, backend, integrations, models, business logic, and workers separated.
+
+---
+
+# 5. MULTI-USER AUTHENTICATION
+
+The application must support multiple users.
+
+Create:
+
+```text
+User
+```
+
+Users must log in before accessing the application.
+
+Each user's infrastructure must be isolated.
+
+User A must NEVER see:
+
+* User B's MailWizz connections
+* User B's mailboxes
+* User B's domains
+* User B's campaigns
+* User B's recipients
+* User B's analytics
+* User B's placement data
+
+Every major database entity must be associated with a `user_id` or equivalent tenant identifier.
+
+Initial authentication:
+
+```text
+Sign Up
+Login
+Logout
+Session/token management
+Protected application routes
+```
+
+Do not build social login initially.
+
+---
+
+# 6. DATABASE MODELS
+
+Use MongoDB with Mongoose.
+
+Create the following models.
+
+## User
+
+```text
+User
+- _id
+- name
+- email
+- password_hash
+- status
+- created_at
+- updated_at
+```
+
+Email must be unique.
+
+Passwords must NEVER be stored in plaintext.
+
+---
+
+## MailWizzConnection
+
+Represents ONE MailWizz installation/API connection.
+
+IMPORTANT:
+
+A MailWizzConnection is NOT one email address.
+
+One MailWizzConnection can contain MANY delivery servers/mailboxes.
+
+Fields:
+
+```text
+MailWizzConnection
+- _id
+- user_id
+- name
+- base_url
+- api_key
+- status
+- last_sync_at
+- last_error
+- created_at
+- updated_at
+```
+
+Example:
+
+```text
+MailWizz #1
+   ↓
+30 delivery servers
+
+MailWizz #2
+   ↓
+25 delivery servers
+
+MailWizz #3
+   ↓
+20 delivery servers
+```
+
+Never create one MailWizz connection per mailbox.
+
+---
+
+## Mailbox
+
+Represents a sending email/delivery server discovered from MailWizz.
+
+Fields:
+
+```text
+Mailbox
+- _id
+- user_id
+- mailwizz_connection_id
+- mailwizz_delivery_server_id
+- email_address
+- type
+- domain
+- hostname
+- mailwizz_customer_name
+- status
+- warmup_start_date
+- daily_cap
+- first_seen_at
+- last_seen_at
+- dropped_at
+- created_at
+- updated_at
+```
+
+`type` should support at least:
+
+```text
+workspace
+smtp
+```
+
+`status` should support:
+
+```text
+active
+paused
+dropped
+```
+
+Do NOT delete a mailbox merely because it disappears from MailWizz.
+
+If it previously existed but is no longer returned by MailWizz:
+
+```text
+status = dropped
+```
+
+Preserve its complete history.
+
+---
+
+## Recipient
+
+Represents the receiving/test account.
+
+Fields:
+
+```text
+Recipient
+- _id
+- user_id
+- email_address
+- type
+- provider
+- outlook_profile
+- move_to_inbox_policy
+- active
+- created_at
+- updated_at
+```
+
+Types:
+
+```text
+seed_gmail
+employee_test
+```
+
+Policies:
+
+```text
+employee_test:
+    never_move
+
+seed_gmail:
+    move_to_inbox_and_reply
+```
+
+The policy must be stored as data/configuration.
+
+Do NOT hardcode the behavior directly into business logic.
+
+---
+
+## Campaign
+
+Fields:
+
+```text
+Campaign
+- _id
+- user_id
+- mailwizz_connection_id
+- mailwizz_campaign_id
+- campaign_name
+- case_number
+- from_group
+- to_group
+- list_id
+- list_name
+- mailwizz_customer_name
+- send_date
+- send_time
+- created_at
+- updated_at
+```
+
+Case numbers must support:
+
+```text
+1
+2
+3
+4
+5
+6
+```
+
+---
+
+## SendEvent
+
+This is the sending-side record.
+
+One record represents an individual send event.
+
+Fields:
+
+```text
+SendEvent
+- _id
+- user_id
+- campaign_id
+- mailbox_id
+- recipient_id
+- mailwizz_message_id
+- mailwizz_subscriber_id
+- recipient_email
+- mailwizz_status
+- bounce_type
+- bounce_reason
+- error_code
+- smtp_response
+- sent_at
+- delivered_at
+- last_synced_at
+- created_at
+- updated_at
+```
+
+Statuses must support at least:
+
+```text
+sent
+delivered
+soft_bounced
+hard_bounced
+deferred
+queued
+error
+blacklisted
+```
+
+Store the raw SMTP response whenever available.
+
+Do not throw away raw server responses.
+
+---
+
+## PlacementEvent
+
+This is the receiving-side record.
+
+Fields:
+
+```text
+PlacementEvent
+- _id
+- user_id
+- send_event_id
+- recipient_id
+- provider
+- folder
+- checked_at
+- moved_to_inbox
+- replied
+- reply_at
+- message_id
+- created_at
+- updated_at
+```
+
+Folder values:
+
+```text
+inbox
+spam
+promotions
+not_found
+```
+
+Do NOT combine Promotions with Inbox.
+
+---
+
+## ReputationSnapshot
+
+Fields:
+
+```text
+ReputationSnapshot
+- _id
+- user_id
+- domain_or_ip
+- source
+- reputation_band
+- blacklisted
+- checked_at
+- created_at
+```
+
+Possible sources:
+
+```text
+postmaster
+mxtoolbox
+spamhaus
+barracuda
+```
+
+Do not make external reputation integrations mandatory for the first milestone.
+
+---
+
+# 7. CRITICAL DATABASE RELATIONSHIP
+
+The most important relationship in the entire system is:
+
+```text
+SendEvent
+    |
+    | send_event_id
+    ↓
+PlacementEvent
+```
+
+This allows the application to answer:
+
+```text
+Which mailbox sent the email?
+Which recipient received it?
+What did MailWizz report?
+Was it delivered?
+Where did it actually land?
+Was it moved?
+Was there a reply?
+```
+
+Do not build analytics that cannot trace back to the individual send event.
+
+---
+
+# 8. MAILWIZZ CONNECTION FUNCTIONALITY
+
+Create a MailWizz Connections page.
+
+The page must support:
+
+```text
+Add MailWizz
+Edit connection
+Test connection
+Sync now
+View connection status
+View last sync
+View number of discovered mailboxes
+Disconnect/remove connection
+```
+
+Example:
+
+```text
+MailWizz #1
+Connected
+35 Mailboxes
+Last Sync: 2 minutes ago
+
+[Sync Now] [Test Connection]
+```
+
+When adding a connection, collect the credentials required by the MailWizz API.
+
+Never expose API keys in the frontend unnecessarily.
+
+Prefer backend-side credential storage.
+
+---
+
+# 9. MAILWIZZ SYNCHRONIZATION
+
+This is the FIRST major integration to implement.
+
+Create:
+
+```text
+integrations/mailwizz/
+    mailwizzClient.ts
+    deliveryServers.ts
+    campaigns.ts
+    analytics.ts
+```
+
+Initially implement only:
+
+```text
+getDeliveryServers()
+```
+
+Then create:
+
+```text
+mailwizzSync.service.ts
+```
+
+The synchronization algorithm must be:
+
+```text
+1. Call MailWizz delivery-server API.
+
+2. Receive all delivery servers.
+
+3. For each delivery server:
+      If not in database:
+          create mailbox
+
+      If already in database:
+          update current information
+          preserve historical data
+
+4. Find previously known mailboxes that are no longer returned.
+
+5. Mark those mailboxes:
+      status = dropped
+
+6. Never delete their historical records.
+
+7. Save:
+      last_sync_at
+```
+
+Make synchronization idempotent.
+
+Running Sync twice must NOT create duplicates.
+
+Use MailWizz delivery-server IDs as unique identifiers within the appropriate MailWizz connection/user scope.
+
+---
+
+# 10. FIRST DEVELOPMENT MILESTONE
+
+Do NOT attempt to build the entire application in one step.
+
+The first milestone is:
+
+```text
+User Signup
+     ↓
+Login
+     ↓
+Add MailWizz Connection
+     ↓
+Test API
+     ↓
+Sync Delivery Servers
+     ↓
+Save Mailboxes
+     ↓
+Display Mailboxes
+```
+
+The developer must get this working end-to-end before implementing campaign analytics.
+
+---
+
+# 11. FIRST UI PAGES
+
+Create these pages initially:
+
+```text
+Login
+Sign Up
+Dashboard
+MailWizz Connections
+Mailboxes
+```
+
+The Dashboard can initially be a placeholder.
+
+Do NOT create fake analytics.
+
+If data does not exist yet, display:
+
+```text
+No data available yet.
+Connect MailWizz and synchronize your mailboxes.
+```
+
+Never fabricate statistics.
+
+---
+
+# 12. APPLICATION NAVIGATION
+
+Use a left sidebar:
+
+```text
+Warmup Control Center
+
+Dashboard
+
+Warmup
+  ├── Campaigns
+  ├── Mailboxes
+  └── Mailbox Detail
+
+Integrations
+  └── MailWizz Connections
+
+Settings
+  └── Account
+```
+
+The final application should have approximately five major functional areas:
+
+1. Dashboard
+2. Mailboxes
+3. Campaigns / Warmup Runs
+4. Mailbox Detail
+5. MailWizz Connections
+
+Login/Signup are authentication screens, not analytics pages.
+
+---
+
+# 13. CAMPAIGN SYNCHRONIZATION
+
+After Mailbox Sync is working, implement campaign synchronization.
+
+Pull available MailWizz campaign information.
+
+Store:
+
+```text
+Campaign
+```
+
+Then synchronize campaign sending information into:
+
+```text
+SendEvent
+```
+
+The application should capture, where available:
+
+* Campaign ID
+* List ID
+* Campaign name
+* List name
+* Customer
+* Campaign date
+* Send time
+* Sent
+* Delivered
+* Soft bounce
+* Hard bounce
+* Deferred
+* Queued
+* Errors
+* Complaints
+* Bounce/error reason
+* SMTP response
+
+Do not prioritize opens/clicks because this application is primarily focused on warmup/deliverability and tracking may be disabled.
+
+---
+
+# 14. PYTHON INBOX CHECKER
+
+There is an existing Python script that can determine whether messages landed in:
+
+```text
+Inbox
+Spam
+Promotions
+Not Found
+```
+
+Do NOT rewrite it initially.
+
+Design an interface so it can send placement results to the Node backend.
+
+Example:
+
+```text
+Python Worker
+      ↓
+POST /api/placements
+      ↓
+PlacementEvent
+```
+
+The worker may eventually use:
+
+* IMAP
+* Gmail API
+* Outlook
+* Headless Python
+
+But keep the receiving implementation modular.
+
+---
+
+# 15. WARMUP CASES
+
+Support these six cases:
+
+```text
+CASE 1
+50 Workspace → 15 Employee Tests
+
+CASE 2
+25 SMTP → 15 Employee Tests
+
+CASE 3
+50 Workspace → 50 Gmail Seeds
+
+CASE 4
+25 SMTP → 50 Gmail Seeds
+
+CASE 5
+25 SMTP → 50 Workspace
+
+CASE 6
+50 Workspace → 25 SMTP
+```
+
+Do not hardcode the account counts.
+
+The case definition should be configurable.
+
+Important rules:
+
+### Employee tests
+
+If mail lands in Spam:
+
+```text
+DO NOT MOVE IT
+```
+
+This is the litmus test.
+
+### Gmail seeds
+
+If mail lands in Spam:
+
+```text
+MOVE TO INBOX
+```
+
+Reply behavior may be implemented later.
+
+### Cases 5 and 6
+
+Replies can be treated as warmup signals.
+
+### Cases 1–4
+
+Do NOT treat replies as warmup evidence.
+
+These distinctions must be represented in configuration/business rules.
+
+---
+
+# 16. DASHBOARD
+
+Build the Dashboard only after the underlying data pipelines work.
+
+The Dashboard should provide a single-glance view.
+
+Show:
+
+### Mailbox summary
+
+```text
+Total
+Active
+Paused
+Dropped
+Healthy
+Warning
+Critical
+```
+
+### Sending metrics
+
+```text
+Sent
+Delivered
+Soft Bounce
+Hard Bounce
+Deferred
+Queued
+Errors
+Complaints
+```
+
+### Placement metrics
+
+```text
+Inbox
+Spam
+Promotions
+Not Found
+```
+
+### Breakdown
+
+Allow filtering by:
+
+```text
+Workspace
+SMTP
+Domain
+MailWizz Connection
+Campaign
+Date
+Provider
+```
+
+Do not collapse all mailboxes into one number.
+
+The user must be able to drill down.
+
+---
+
+# 17. MAILBOX DETAIL PAGE
+
+Clicking any mailbox must open a detailed page.
+
+Example:
+
+```text
+workspace23@example.com
+
+Type: Workspace
+Domain: example.com
+MailWizz: MW-02
+Status: Active
+
+---------------------------------
+
+Sending
+
+Sent
+Delivered
+Bounce
+Deferred
+Errors
+
+---------------------------------
+
+Placement
+
+Inbox
+Spam
+Promotions
+Not Found
+
+---------------------------------
+
+Historical Trend
+
+Day 1
+Day 2
+Day 3
+...
+
+---------------------------------
+
+Individual Sends
+
+Recipient
+Date
+MailWizz Status
+Placement
+Bounce/Error
+Reply
+```
+
+This page is critical.
+
+The product must answer:
+
+> "What happened to X, Y or Z mailbox?"
+
+---
+
+# 18. DATA SOURCE PRINCIPLE
+
+Follow this architecture strictly.
+
+```text
+MAILWIZZ
+   ↓
+Sending information
+
+PYTHON / IMAP / GMAIL
+   ↓
+Placement information
+
+DATABASE
+   ↓
+Unified source for application analytics
+
+DESKTOP UI
+   ↓
+Presentation + user interaction
+```
+
+Do not make the frontend directly responsible for business logic.
+
+Backend computes.
+
+Frontend renders.
+
+Database is the persistent source for the application's unified view.
+
+---
+
+# 19. SECURITY
+
+Implement:
+
+* Password hashing
+* Authentication
+* Authorization
+* User-level data isolation
+* Secure API key storage
+* Environment variables
+* No API keys hardcoded
+* No credentials committed to Git
+* Input validation
+* Error handling
+* Audit-friendly logs
+
+Create:
+
+```text
+.env.example
+```
+
+Never commit the actual `.env`.
+
+---
+
+# 20. CODE QUALITY RULES
+
+Follow these rules:
+
+1. TypeScript strict mode.
+2. No `any` unless absolutely unavoidable.
+3. No giant files.
+4. No duplicated business logic.
+5. No hardcoded MailWizz URLs.
+6. No hardcoded mailbox counts.
+7. No hardcoded user IDs.
+8. No fake analytics.
+9. No deleting historical mailbox records during sync.
+10. All sync operations must be idempotent.
+11. Add proper indexes for frequently queried fields.
+12. Validate API inputs.
+13. Centralize error handling.
+14. Keep MailWizz integration isolated from the rest of the application.
+15. Keep Python worker integration isolated.
+16. Use service/controller/route separation.
+17. Keep frontend components reusable.
+18. Keep database models independent from UI components.
+
+---
+
+# 21. DEVELOPMENT PHILOSOPHY
+
+Do not attempt to generate the entire finished application in one giant implementation.
+
+Build in verified vertical slices.
+
+### Milestone 1
+
+```text
+Authentication
++
+MailWizz Connection
++
+Delivery Server Sync
++
+Mailbox List
+```
+
+### Milestone 2
+
+```text
+Campaign Sync
++
+Send Events
+```
+
+### Milestone 3
+
+```text
+Python Inbox Checker
++
+Placement Events
+```
+
+### Milestone 4
+
+```text
+SendEvent ↔ PlacementEvent
+```
+
+### Milestone 5
+
+```text
+Dashboard
+```
+
+### Milestone 6
+
+```text
+Mailbox Detail
++
+Warmup Cases
++
+Reputation
+```
+
+After every milestone:
+
+* Run TypeScript build
+* Run tests
+* Check database indexes
+* Test API endpoints
+* Test UI
+* Fix errors before continuing
+
+---
+
+# 22. DO NOT DO THESE THINGS
+
+Do NOT:
+
+* Build only a static UI.
+* Populate the application with fake mailbox data.
+* Hardcode 75 mailboxes.
+* Require CSV upload for MailWizz sending mailboxes.
+* Create one connection per mailbox.
+* Delete mailbox history when a delivery server disappears.
+* Put MailWizz API credentials in React.
+* Rewrite the Python inbox checker before understanding its current interface.
+* Build analytics before establishing reliable data synchronization.
+* Treat aggregate statistics as sufficient.
+* Mix Inbox and Promotions.
+* Assume MailWizz knows where a message landed.
+* Assume an email landing in your seed inbox means the sender has global reputation.
+* Treat seed/employee placement as equivalent to real prospect behavior.
+
+---
+
+# 23. FIRST TASK FOR THE CODING AGENT
+
+Start now.
+
+First inspect the existing workspace/repository.
+
+If an existing project exists, DO NOT destroy or replace it.
+
+Determine:
+
+* Current framework
+* Existing React setup
+* Existing backend
+* Existing database
+* Existing Electron/Tauri setup
+* Existing package manager
+* Existing environment configuration
+
+Then create a development plan.
+
+After inspection, implement **Milestone 1 only**:
+
+```text
+Authentication
+        ↓
+MailWizz Connection
+        ↓
+Test API
+        ↓
+Delivery Server Sync
+        ↓
+Mailbox database records
+        ↓
+Mailbox UI
+```
+
+Do not proceed to campaign analytics until Milestone 1 is working.
+
+At the end, report:
+
+1. Files created
+2. Files modified
+3. Database models created
+4. API routes created
+5. MailWizz endpoints implemented
+6. Environment variables required
+7. How to run the application
+8. How to test MailWizz connection
+9. How mailbox synchronization works
+10. Any unresolved issues
+
+Never claim a feature is complete unless it actually builds and runs.
+
+---
+
+# 24. FINAL PRODUCT VISION
+
+The final application should allow a user to do this:
+
+```text
+LOGIN
+  ↓
+CONNECT MAILWIZZ #1
+CONNECT MAILWIZZ #2
+CONNECT MAILWIZZ #3
+  ↓
+SYNC
+  ↓
+75+ MAILBOXES DISCOVERED
+  ↓
+RUN WARMUP
+  ↓
+MAILWIZZ SEND DATA
+        +
+INBOX CHECKER DATA
+        ↓
+UNIFIED DATABASE
+        ↓
+WARMUP CONTROL CENTER
+        ↓
+Dashboard
+        ↓
+Mailbox
+        ↓
+Individual Send
+        ↓
+Actual Placement
+```
+
+The final product is therefore a **Warmup Control Center**, not another MailWizz clone.
+
+Its primary purpose is:
+
+> **Give the user complete, mailbox-level visibility into email warmup by joining what MailWizz says happened during sending with what actually happened inside the receiving mailbox.**

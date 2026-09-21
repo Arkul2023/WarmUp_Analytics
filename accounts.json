@@ -1,0 +1,112 @@
+[
+  {
+    "email": "albert.william@vasetebazar.com",
+    "password": "oyov hxyt javp hdcy",
+    "account_type": "workspace",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Albert William",
+    "signature": "\n\nBest regards,\nAlbert William"
+  },
+  {
+    "email": "allen.jones@modzlab.com",
+    "password": "kimp neyf ypzw yfat",
+    "account_type": "workspace",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Allen Jones",
+    "signature": "\n\nBest regards,\nAllen Jones"
+  },
+  {
+    "email": "austin.davis@segatravelmauritius.com",
+    "password": "gxte lgcg ttbc lyxv",
+    "account_type": "workspace",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "austin.davis",
+    "signature": "\n\nBest regards,\nAustin Davis"
+  },
+  {
+    "email": "bradley.moore@rfolympic.com",
+    "password": "kljw ceix ddax vccl",
+    "account_type": "workspace",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Bradley Moore",
+    "signature": "\n\nBest regards,\nBradley Moore"
+  },
+  {
+    "email": "brent.taylor@zhinogallery.com",
+    "password": "lrfl kkds ipyl eguq",
+    "account_type": "workspace",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Brent Taylor",
+    "signature": "\n\nBest regards,\nBrent Taylor"
+  },
+  {
+    "email": "maureenfergu54@gmail.com",
+    "password": "vdxo dcul ohyv kbgr",
+    "account_type": "seed",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Maureen Fergu",
+    "signature": "\n\nBest regards,\nMaureen Fergu"
+  },
+  {
+    "email": "genevascott1945@gmail.com",
+    "password": "iavx dasd awhb rcow",
+    "account_type": "seed",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Geneva Scott",
+    "signature": "\n\nBest regards,\nGeneva Scott"
+  },
+  {
+    "email": "ettagardner19@gmail.com",
+    "password": "fysn yfhz ghvg xgtn",
+    "account_type": "seed",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Etta Gardner",
+    "signature": "\n\nBest regards,\nEtta Gardner"
+  },
+  {
+    "email": "janieadams1953@gmail.com",
+    "password": "bliz nazn zdrf axbe",
+    "account_type": "seed",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Janie Adams",
+    "signature": "\n\nBest regards,\nJanie Adams"
+  },
+  {
+    "email": "shawnarhodes148@gmail.com",
+    "password": "nflj kttj pjwo jqid",
+    "account_type": "seed",
+    "imap_host": "imap.gmail.com",
+    "imap_port": 993,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "display_name": "Shawna Rhodes",
+    "signature": "\n\nBest regards,\nShawna Rhodes"
+  }
+]
